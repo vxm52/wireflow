@@ -1,73 +1,136 @@
-# Welcome to your Lovable project
+# Wireflow - Turn Wireframes Into Code
 
-## Project info
+A modern web application that converts wireframes and UI screenshots into clean, responsive React/JSX code using AI.
 
-**URL**: https://lovable.dev/projects/d2c281a3-1fdb-49e8-81da-b65d46d5777d
+## Features
 
-## How can I edit this code?
+- 🎨 **Drag & Drop Upload**: Easy image upload with drag-and-drop support
+- 🤖 **AI-Powered Code Generation**: Uses OpenAI to generate clean React/JSX code
+- 🎯 **Layout Detection**: Analyzes wireframes to detect UI elements and structure
+- 💻 **Syntax Highlighting**: Beautiful code display with syntax highlighting
+- 🌙 **Dark Mode**: Toggle between light and dark themes
+- 📱 **Responsive Design**: Works perfectly on desktop and mobile devices
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+### Frontend
+- **React 18** with TypeScript
+- **Vite** for fast development and building
+- **Tailwind CSS** for styling
+- **shadcn/ui** for UI components
+- **React Router** for navigation
+- **React Query** for data fetching
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/d2c281a3-1fdb-49e8-81da-b65d46d5777d) and start prompting.
+### Backend
+- **FastAPI** for the API server
+- **OpenAI API** for code generation
+- **PIL** for image processing
+- **Python-multipart** for file uploads
 
-Changes made via Lovable will be committed automatically to this repo.
+## Quick Start
 
-**Use your preferred IDE**
+### Prerequisites
+- Node.js 18+ and npm
+- Python 3.8+ and pip
+- OpenAI API key
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Frontend Setup
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. **Install dependencies:**
+```bash
+npm install
+```
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+2. **Start the development server:**
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+3. **Open your browser:**
+Navigate to `http://localhost:5173`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Backend Setup
 
-**Use GitHub Codespaces**
+1. **Navigate to backend directory:**
+```bash
+cd backend
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+2. **Install Python dependencies:**
+```bash
+pip install -r requirements.txt
+```
 
-## What technologies are used for this project?
+3. **Create environment file:**
+Create a `.env` file in the backend directory:
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+HOST=0.0.0.0
+PORT=8000
+DEBUG=True
+```
 
-This project is built with:
+4. **Start the backend server:**
+```bash
+python run.py
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+The API will be available at `http://localhost:8000`
 
-## How can I deploy this project?
+## Usage
 
-Simply open [Lovable](https://lovable.dev/projects/d2c281a3-1fdb-49e8-81da-b65d46d5777d) and click on Share -> Publish.
+1. **Upload a wireframe**: Drag and drop or click to upload an image
+2. **Generate code**: Click the "Generate Code" button
+3. **View results**: The generated React/JSX code will appear in the code block
+4. **Copy code**: Use the syntax highlighter to copy the generated code
 
-## Can I connect a custom domain to my Lovable project?
+## API Endpoints
 
-Yes, you can!
+- `GET /` - Health check
+- `GET /health` - Health check
+- `POST /generate` - Generate code from uploaded image
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Development
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### Project Structure
+```
+wireflow/
+├── src/
+│   ├── components/     # React components
+│   ├── lib/           # Utilities and API functions
+│   ├── pages/         # Page components
+│   └── hooks/         # Custom React hooks
+├── backend/
+│   ├── services/      # Backend services
+│   ├── main.py        # FastAPI application
+│   └── requirements.txt
+└── public/            # Static assets
+```
+
+### Available Scripts
+
+**Frontend:**
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+
+**Backend:**
+- `python run.py` - Start FastAPI server
+- `python -m uvicorn main:app --reload` - Start with auto-reload
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+MIT License - see LICENSE file for details
+
+## Support
+
+For support, please open an issue on GitHub or contact the development team.
