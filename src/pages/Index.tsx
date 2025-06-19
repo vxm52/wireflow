@@ -1,22 +1,26 @@
-
 import React, { useState, useCallback } from 'react';
-import { Upload, Code, Sun, Moon, Image as ImageIcon } from 'lucide-react';
+import { Upload, Code, Sun, Moon, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useToast } from '@/hooks/use-toast';
+import { generateCode, base64ToBlob, ApiError } from '@/lib/api';
 
 const Index = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [generatedCode, setGeneratedCode] = useState<string>('');
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const { toast } = useToast();
 
   const handleFileUpload = useCallback((file: File) => {
     if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (e) => {
         setUploadedImage(e.target?.result as string);
+        setGeneratedCode(''); // Clear previous code when new image is uploaded
       };
       reader.readAsDataURL(file);
     }
@@ -48,36 +52,49 @@ const Index = () => {
     }
   }, [handleFileUpload]);
 
-  const generateCode = () => {
-    // Placeholder code generation - in real app this would use AI/ML
-    const sampleCode = `<div className="container mx-auto p-6">
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <div className="space-y-4">
-      <h1 className="text-3xl font-bold text-gray-900">
-        Welcome to Your App
-      </h1>
-      <p className="text-gray-600 leading-relaxed">
-        This is a sample component generated from your wireframe.
-        The layout includes responsive grid, typography, and spacing.
-      </p>
-      <div className="flex space-x-4">
-        <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-          Get Started
-        </button>
-        <button className="border border-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-50 transition-colors">
-          Learn More
-        </button>
-      </div>
-    </div>
-    <div className="bg-gray-100 rounded-lg p-8 flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-16 h-16 bg-gray-300 rounded-full mx-auto mb-4"></div>
-        <p className="text-gray-500">Placeholder Image</p>
-      </div>
-    </div>
-  </div>
-</div>`;
-    setGeneratedCode(sampleCode);
+  const generateCodeHandler = async () => {
+    if (!uploadedImage) {
+      toast({
+        title: "No image uploaded",
+        description: "Please upload an image first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      // Convert base64 to blob for API call
+      const base64Data = uploadedImage.split(',')[1];
+      const imageFile = await base64ToBlob(base64Data, 'wireframe.png');
+
+      const response = await generateCode(imageFile);
+      setGeneratedCode(response.code);
+
+      toast({
+        title: "Code generated successfully!",
+        description: "Your wireframe has been converted to code.",
+      });
+    } catch (error) {
+      console.error('Error generating code:', error);
+
+      let errorMessage = "Please try again or check if the backend is running.";
+      if (error instanceof ApiError) {
+        if (error.status === 404) {
+          errorMessage = "Backend service not found. Please ensure the FastAPI server is running.";
+        } else if (error.status === 500) {
+          errorMessage = "Server error occurred. Please try again later.";
+        }
+      }
+
+      toast({
+        title: "Error generating code",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const toggleDarkMode = () => {
@@ -86,7 +103,9 @@ const Index = () => {
   };
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'dark bg-gray-900' : 'bg-gradient-to-br from-blue-50 via-white to-purple-50'}`}>
+    <div className={`min-h-screen transition-colors duration-300 ${
+      isDarkMode ? 'dark bg-gray-900' : 'bg-gradient-to-br from-blue-50 via-white to-purple-50'
+    }`}>
       {/* Header */}
       <header className="container mx-auto px-4 py-6 flex justify-between items-center">
         <div className="flex items-center space-x-2">
@@ -95,7 +114,7 @@ const Index = () => {
             Wireflow
           </span>
         </div>
-        
+
         <Button
           variant="ghost"
           size="icon"
@@ -130,7 +149,7 @@ const Index = () => {
                 <h2 className={`text-2xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                   Upload Your Design
                 </h2>
-                
+
                 {/* Dropzone */}
                 <div
                   onDrop={handleDrop}
@@ -151,7 +170,7 @@ const Index = () => {
                     onChange={handleFileInputChange}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
-                  
+
                   <Upload className={`w-12 h-12 mx-auto mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
                   <p className={`text-lg font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                     Drop your wireframe here
@@ -180,13 +199,23 @@ const Index = () => {
                       className="w-full h-auto max-h-96 object-contain bg-white"
                     />
                   </div>
-                  
+
                   <Button
-                    onClick={generateCode}
-                    className="w-full mt-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-300 transform hover:scale-[1.02]"
+                    onClick={generateCodeHandler}
+                    disabled={isGenerating}
+                    className="w-full mt-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Code className="w-5 h-5 mr-2" />
-                    Generate Code
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Code className="w-5 h-5 mr-2" />
+                        Generate Code
+                      </>
+                    )}
                   </Button>
                 </CardContent>
               </Card>
@@ -200,7 +229,7 @@ const Index = () => {
                 <h2 className={`text-2xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                   Generated Code
                 </h2>
-                
+
                 {generatedCode ? (
                   <div className="flex-1 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
                     <SyntaxHighlighter
@@ -221,7 +250,7 @@ const Index = () => {
                     <div className="text-center">
                       <Code className={`w-16 h-16 mx-auto mb-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} />
                       <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Upload a design to generate code
+                        {isGenerating ? 'Generating code...' : 'Upload a design to generate code'}
                       </p>
                     </div>
                   </div>
