@@ -119,18 +119,10 @@ wireflow/
 - `python run.py` - Start FastAPI server
 - `python -m uvicorn main:app --reload` - Start with auto-reload
 
-## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+## 🧪 Project Note
 
-## License
-
-MIT License - see LICENSE file for details
-
-## Support
-
-For support, please open an issue on GitHub or contact the development team.
+**Wireflow** was built as a learning project to explore:
+- Fast prototyping using modern AI tools
+- Building full-stack MVPs with React and FastAPI
+- Working with OpenAI APIs and image processing
