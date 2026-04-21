@@ -27,16 +27,17 @@ app.add_middleware(
 # Initialize services
 layout_detector = LayoutDetector()
 code_generator = CodeGenerator()
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
-@app.get("/")
+@app.get "/"
 async def root():
     return {"message": "Wireflow API is running"}
 
-@app.get("/health")
+@app.get "/health"
 async def health_check():
     return {"status": "healthy"}
 
-@app.post("/generate")
+@app.post "/generate"
 async def generate_code(image: UploadFile = File(...)):
     """
     Generate code from uploaded wireframe image
@@ -45,6 +46,10 @@ async def generate_code(image: UploadFile = File(...)):
         # Validate file type
         if not image.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="File must be an image")
+
+        # Check file size
+        if image.filename and os.path.getsize(image.file.filename) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail=f"File size exceeds the maximum limit of {MAX_FILE_SIZE / (1024 * 1024)} MB")
 
         # Read image content
         image_content = await image.read()
