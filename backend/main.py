@@ -5,6 +5,8 @@ import os
 from dotenv import load_dotenv
 from services.code_generator import CodeGenerator
 from services.layout_detector import LayoutDetector
+from PIL import Image
+import io
 
 # Load environment variables
 load_dotenv()
@@ -48,6 +50,12 @@ async def generate_code(image: UploadFile = File(...)):
 
         # Read image content
         image_content = await image.read()
+
+        # Validate image contents
+        try:
+            Image.open(io.BytesIO(image_content))
+        except IOError:
+            raise HTTPException(status_code=400, detail="Invalid image file")
 
         # Detect layout from image
         layout_data = await layout_detector.detect_layout(image_content)
