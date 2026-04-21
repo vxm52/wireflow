@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 from services.code_generator import CodeGenerator
 from services.layout_detector import LayoutDetector
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -12,7 +13,13 @@ load_dotenv()
 app = FastAPI(
     title="Wireflow API",
     description="API for converting wireframes to code",
-    version="1.0.0"
+    version="1.0.0",
+    contact={
+        "name": "Wireflow API Team",
+        "email": "wireflowapi@example.com",
+        "version": "1.0.0",
+        "timestamp": str(datetime.now())
+    }
 )
 
 # Add CORS middleware
@@ -30,11 +37,11 @@ code_generator = CodeGenerator()
 
 @app.get("/")
 async def root():
-    return {"message": "Wireflow API is running"}
+    return {"message": "Wireflow API is running", "version": "1.0.0", "timestamp": str(datetime.now())}
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {"status": "healthy", "version": "1.0.0", "timestamp": str(datetime.now())}
 
 @app.post("/generate")
 async def generate_code(image: UploadFile = File(...)):
@@ -57,12 +64,14 @@ async def generate_code(image: UploadFile = File(...)):
 
         return JSONResponse(content={
             "code": generated_code,
-            "message": "Code generated successfully"
+            "message": "Code generated successfully",
+            "version": "1.0.0",
+            "timestamp": str(datetime.now())
         })
 
     except Exception as e:
         print(f"Error generating code: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error generating code: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating code: {str(e)}", headers={"version": "1.0.0", "timestamp": str(datetime.now())})
 
 if __name__ == "__main__":
     import uvicorn
