@@ -60,9 +60,21 @@ async def generate_code(image: UploadFile = File(...)):
             "message": "Code generated successfully"
         })
 
+    except HTTPException as e:
+        print(f"HTTP Error generating code: {str(e)}")
+        raise e
+
+    except ConnectionError as e:
+        print(f"Connection Error generating code: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Connection Error: {str(e)}")
+
+    except FileNotFoundError as e:
+        print(f"File not found: {str(e)}")
+        raise HTTPException(status_code=404, detail=f"File not found: {str(e)}")
+
     except Exception as e:
-        print(f"Error generating code: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error generating code: {str(e)}")
+        print(f"Unknown Error generating code: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unknown Error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
