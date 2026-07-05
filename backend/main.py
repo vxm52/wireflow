@@ -1,3 +1,4 @@
+```python
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -28,6 +29,30 @@ app.add_middleware(
 layout_detector = LayoutDetector()
 code_generator = CodeGenerator()
 
+# Custom error classes
+class FileTypeValidationError(Exception):
+    """Raised when file type is invalid"""
+    pass
+
+class CodeGenerationError(Exception):
+    """Raised when code generation fails"""
+    pass
+
+# Custom error handlers
+@app.exception_handler(FileTypeValidationError)
+async def handle_file_type_validation_error(request, exc):
+    return JSONResponse(status_code=400, content={
+        "error": "File type validation error",
+        "message": str(exc)
+    })
+
+@app.exception_handler(CodeGenerationError)
+async def handle_code_generation_error(request, exc):
+    return JSONResponse(status_code=500, content={
+        "error": "Code generation error",
+        "message": str(exc)
+    })
+
 @app.get("/")
 async def root():
     return {"message": "Wireflow API is running"}
@@ -44,7 +69,7 @@ async def generate_code(image: UploadFile = File(...)):
     try:
         # Validate file type
         if not image.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="File must be an image")
+            raise FileTypeValidationError("File must be an image")
 
         # Read image content
         image_content = await image.read()
@@ -61,9 +86,9 @@ async def generate_code(image: UploadFile = File(...)):
         })
 
     except Exception as e:
-        print(f"Error generating code: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error generating code: {str(e)}")
+        raise CodeGenerationError(f"Error generating code: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+```
