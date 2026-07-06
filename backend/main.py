@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 from services.code_generator import CodeGenerator
 from services.layout_detector import LayoutDetector
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -30,11 +31,11 @@ code_generator = CodeGenerator()
 
 @app.get("/")
 async def root():
-    return {"message": "Wireflow API is running"}
+    return {"message": "Wireflow API is running", "version": "1.0.0", "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {"status": "healthy", "version": "1.0.0", "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 @app.post("/generate")
 async def generate_code(image: UploadFile = File(...)):
@@ -57,7 +58,9 @@ async def generate_code(image: UploadFile = File(...)):
 
         return JSONResponse(content={
             "code": generated_code,
-            "message": "Code generated successfully"
+            "message": "Code generated successfully",
+            "version": "1.0.0",
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
 
     except Exception as e:
