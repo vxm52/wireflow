@@ -2,6 +2,7 @@ import os
 from typing import Dict, Any
 import openai
 from openai import OpenAI
+import logging
 
 class CodeGenerator:
     """
@@ -36,7 +37,7 @@ class CodeGenerator:
             
         except Exception as e:
             # Fallback to mock code if OpenAI fails
-            print(f"Error calling OpenAI: {str(e)}")
+            logging.error(f"Error calling OpenAI: {str(e)}")
             return self._generate_fallback_code(layout_data)
     
     def _create_prompt(self, layout_data: Dict[str, Any]) -> str:
@@ -210,4 +211,4 @@ Generate the React/JSX code:
         jsx_parts.append('  </div>')
         jsx_parts.append('</div>')
         
-        return "\n".join(jsx_parts) 
+        return "\n".join(jsx_parts)

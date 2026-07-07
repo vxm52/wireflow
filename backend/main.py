@@ -60,6 +60,9 @@ async def generate_code(image: UploadFile = File(...)):
             "message": "Code generated successfully"
         })
 
+    except HTTPException as e:
+        print(f"Error generating code: {str(e)}")
+        raise e
     except Exception as e:
         print(f"Error generating code: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error generating code: {str(e)}")
