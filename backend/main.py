@@ -1,3 +1,4 @@
+```python
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -60,10 +61,15 @@ async def generate_code(image: UploadFile = File(...)):
             "message": "Code generated successfully"
         })
 
+    except (RuntimeError, TypeError, ValueError) as e:
+        print(f"Error generating code: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
     except Exception as e:
         print(f"Error generating code: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error generating code: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+```

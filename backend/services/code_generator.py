@@ -1,4 +1,6 @@
+```python
 import os
+import logging
 from typing import Dict, Any
 import openai
 from openai import OpenAI
@@ -11,6 +13,7 @@ class CodeGenerator:
     def __init__(self):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.model = "gpt-4"  # or "gpt-3.5-turbo" for faster/cheaper responses
+        logging.basicConfig(level=logging.INFO)
     
     async def generate_code(self, layout_data: Dict[str, Any]) -> str:
         """
@@ -34,9 +37,13 @@ class CodeGenerator:
             
             return generated_code
             
+        except openai.OpenAIError as e:
+            # Log OpenAI API error with Python logging module
+            logging.error(f"OpenAI API error: {str(e)}")
+            return self._generate_fallback_code(layout_data)
         except Exception as e:
-            # Fallback to mock code if OpenAI fails
-            print(f"Error calling OpenAI: {str(e)}")
+            # Fallback to mock code if other errors occur
+            logging.error(f"Error calling OpenAI: {str(e)}")
             return self._generate_fallback_code(layout_data)
     
     def _create_prompt(self, layout_data: Dict[str, Any]) -> str:
@@ -114,7 +121,9 @@ Generate the React/JSX code:
             
             return response.choices[0].message.content
             
-        except Exception as e:
+        except openai.OpenAIError as e:
+            # Log OpenAI API error with Python logging module
+            logging.error(f"OpenAI API error: {str(e)}")
             raise Exception(f"OpenAI API error: {str(e)}")
     
     def _extract_code_from_response(self, response: str) -> str:
@@ -210,4 +219,5 @@ Generate the React/JSX code:
         jsx_parts.append('  </div>')
         jsx_parts.append('</div>')
         
-        return "\n".join(jsx_parts) 
+        return "\n".join(jsx_parts)
+```
