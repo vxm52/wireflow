@@ -1,8 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { parse } from "@babel/parser";
+import { checkDailyBudget, checkIpLimit, getClientIp } from "@/lib/ratelimit";
 
 const ACCEPTED_TYPES = ["image/png", "image/jpeg"] as const;
 type AcceptedType = (typeof ACCEPTED_TYPES)[number];
+
+// Backstop only. The client downscales before uploading (see
+// src/lib/downscale.ts), and this sits below Vercel's hard 4.5 MB request-body
+// limit so anything oversized that slips through still gets our 413 rather
+// than the platform's raw FUNCTION_PAYLOAD_TOO_LARGE.
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 const PROMPT = `Convert this wireframe image into a single React function component.
 
@@ -40,6 +47,18 @@ function extractCode(text: string): string {
  * is no fallback component.
  */
 export async function POST(request: Request) {
+  // Abuse guards first: this endpoint is public and every call costs money.
+  // Both fail open if Redis is down (see src/lib/ratelimit.ts).
+  const ip = getClientIp(request);
+  const perIp = await checkIpLimit(ip);
+  if (!perIp.allowed) {
+    return Response.json({ error: perIp.reason }, { status: 429 });
+  }
+  const daily = await checkDailyBudget();
+  if (!daily.allowed) {
+    return Response.json({ error: daily.reason }, { status: 429 });
+  }
+
   let file: FormDataEntryValue | null;
   try {
     file = (await request.formData()).get("image");
@@ -58,6 +77,10 @@ export async function POST(request: Request) {
       { error: `Unsupported image type '${file.type || "unknown"}'. Use PNG or JPG.` },
       { status: 400 },
     );
+  }
+
+  if (file.size > MAX_IMAGE_BYTES) {
+    return Response.json({ error: "Image too large (max 4 MB)." }, { status: 413 });
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {

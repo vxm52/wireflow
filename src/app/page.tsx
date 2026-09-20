@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { tokenize, type TokenKind } from "@/components/highlight";
+import { downscaleForUpload } from "@/lib/downscale";
 import {
   buildPreviewDoc,
   PREVIEW_MESSAGE_SOURCE,
@@ -97,8 +98,13 @@ export default function Home() {
     setError(null);
 
     try {
+      // Upload a downscaled copy, not the raw file: Vercel rejects bodies over
+      // 4.5 MB before the route runs. `file` itself is untouched, so the
+      // selected-file chip keeps showing the original name and size.
+      const upload = await downscaleForUpload(file);
+
       const body = new FormData();
-      body.append("image", file);
+      body.append("image", upload, upload.name);
 
       const res = await fetch("/api/generate", { method: "POST", body });
       const text = await res.text();
