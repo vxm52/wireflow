@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { tokenize, type TokenKind } from "@/components/highlight";
+import {
+  buildPreviewDoc,
+  PREVIEW_MESSAGE_SOURCE,
+  previewToken,
+  type PreviewMessage,
+} from "@/components/preview-doc";
 import {
   AlertIcon,
   ArrowRightIcon,
@@ -149,11 +155,10 @@ export default function Home() {
         <div className="mb-[22px]">
           <h1 className="text-[33px] leading-[1.05] font-extrabold tracking-[-0.035em] max-[800px]:text-[27px]">
             Wireframe in{" "}
-            {/* Plus Jakarta's latin subset has no U+2192; pin the fallback so
-                the arrow matches the reference rather than Next's Arial fallback. */}
-            <span className="mx-0.5 font-[system-ui] font-bold text-spark" aria-hidden>
-              →
-            </span>
+            {/* Drawn, not typed: Plus Jakarta's latin subset has no U+2192, so
+                the character falls back to whatever the OS supplies and its
+                weight and length change per platform. */}
+            <ArrowRightIcon className="inline size-[0.95em] align-[-0.07em] text-spark" />
             <span className="sr-only">to</span> component out.
           </h1>
           <p className="mt-[9px] text-[15px] font-medium text-ink-2">
@@ -479,14 +484,96 @@ function CopyButton({ code }: { code: string | null }) {
   );
 }
 
+// What the preview sandbox has told us about the current component. The
+// Preview may only claim to have rendered once the iframe says a component
+// actually mounted.
+type MountState =
+  | { kind: "pending" }
+  | { kind: "mounted" }
+  | { kind: "failed"; message: string };
+
+const VIEWPORTS = [
+  { id: "desktop", label: "Desktop" },
+  { id: "mobile", label: "Mobile" },
+] as const;
+
+type Viewport = (typeof VIEWPORTS)[number]["id"];
+
+// Backstop for an iframe that never loads or never speaks at all; the
+// in-document watchdog handles the cases where its scripts did run.
+const SANDBOX_TIMEOUT_MS = 15_000;
+
+// Why the preview can't render, when there is nothing to render.
+const NOTHING_TO_RENDER: Record<Result["kind"], string> = {
+  idle: "nothing generated yet",
+  loading: "waiting on the model",
+  success: "",
+  "parse-error": "code did not parse",
+};
+
 function PreviewFrame({ result }: { result: Result }) {
+  const code = result.kind === "success" ? result.code : null;
+  const [viewport, setViewport] = useState<Viewport>("desktop");
+  const [reported, setReported] = useState<{ token: string; state: MountState } | null>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+
+  const token = useMemo(() => (code === null ? "" : previewToken(code)), [code]);
+  const srcDoc = useMemo(
+    () => (code === null ? null : buildPreviewDoc(code, token)),
+    [code, token],
+  );
+
+  // Anything reported about an earlier document is not about this one, so a
+  // token mismatch simply reads as pending — no state reset on swap.
+  const mount: MountState =
+    reported && reported.token === token ? reported.state : { kind: "pending" };
+
+  useEffect(() => {
+    if (srcDoc === null) return;
+
+    function onMessage(event: MessageEvent) {
+      // The iframe is sandboxed without allow-same-origin, so its origin is
+      // the opaque "null" and useless as a check. Identity of the window it
+      // came from, plus the token, is what says this is our preview talking.
+      if (event.source !== frameRef.current?.contentWindow) return;
+      const data = event.data as Partial<PreviewMessage> | null;
+      if (!data || data.source !== PREVIEW_MESSAGE_SOURCE || data.token !== token) return;
+
+      if (data.status === "error") {
+        setReported({
+          token,
+          state: { kind: "failed", message: data.message || "Unknown error." },
+        });
+      } else if (data.status === "mounted") {
+        // A reported failure is the truth; never downgrade it to a success.
+        setReported((prev) =>
+          prev?.token === token && prev.state.kind === "failed"
+            ? prev
+            : { token, state: { kind: "mounted" } },
+        );
+      }
+    }
+
+    window.addEventListener("message", onMessage);
+    const timer = setTimeout(() => {
+      setReported((prev) =>
+        prev?.token === token
+          ? prev
+          : { token, state: { kind: "failed", message: "No response from the preview sandbox." } },
+      );
+    }, SANDBOX_TIMEOUT_MS);
+
+    return () => {
+      window.removeEventListener("message", onMessage);
+      clearTimeout(timer);
+    };
+  }, [srcDoc, token]);
+
+  const failed = srcDoc !== null && mount.kind === "failed";
   const message = {
     idle: { title: "Nothing to preview yet", body: "Generate a component to see it here." },
     loading: { title: "Generating…", body: "Waiting on the model." },
-    success: {
-      title: "Component generated",
-      body: "Live rendering isn’t built yet — the source is in the Code frame.",
-    },
+    success: { title: "", body: "" }, // unused: the iframe has the screen
     "parse-error": {
       title: "Nothing to render",
       body: "The generated code didn’t parse, so there is nothing to preview.",
@@ -495,28 +582,35 @@ function PreviewFrame({ result }: { result: Result }) {
 
   return (
     <section aria-labelledby="preview-frame" className="flex min-w-0 flex-col">
-      <FrameName>
+      <FrameName fault={failed ? "render failed" : undefined}>
         <span id="preview-frame">Preview</span>
       </FrameName>
-      <div className="flex flex-1 flex-col overflow-hidden rounded-panel border border-spark bg-surface shadow-[0_0_0_3px_var(--color-spark-soft),var(--shadow-soft)]">
+      <div
+        className={`flex flex-1 flex-col overflow-hidden rounded-panel border bg-surface ${
+          failed
+            ? "border-fault-line shadow-[0_0_0_3px_var(--color-fault-soft),var(--shadow-soft)]"
+            : "border-spark shadow-[0_0_0_3px_var(--color-spark-soft),var(--shadow-soft)]"
+        }`}
+      >
         <PanelHeader>
           <span className="font-mono text-[11px] text-ink-3">localhost</span>
           <div
             role="radiogroup"
-            aria-label="Preview viewport (available once live preview is built)"
-            title="Available once live preview is built"
-            className="flex rounded-lg border border-line bg-inset p-[3px] opacity-60"
+            aria-label="Preview viewport"
+            className="flex rounded-lg border border-line bg-inset p-[3px]"
           >
-            {["Desktop", "Mobile"].map((label, i) => (
+            {VIEWPORTS.map(({ id, label }) => (
               <button
-                key={label}
+                key={id}
                 type="button"
                 role="radio"
-                aria-checked={i === 0}
-                disabled
-                className={`cursor-not-allowed rounded-md px-2.5 py-1 text-[11.5px] font-medium ${
-                  i === 0 ? "bg-surface text-ink shadow-sm" : "text-ink-3"
-                }`}
+                aria-checked={viewport === id}
+                onClick={() => setViewport(id)}
+                className={`rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors ${
+                  viewport === id
+                    ? "bg-surface text-ink shadow-sm"
+                    : "text-ink-3 hover:text-ink-2"
+                } ${FOCUS}`}
               >
                 {label}
               </button>
@@ -524,21 +618,69 @@ function PreviewFrame({ result }: { result: Result }) {
           </div>
         </PanelHeader>
 
-        <div className="screen-dots flex min-h-[330px] flex-1 items-center justify-center p-6">
-          <div
-            className="w-full max-w-[280px] rounded-[14px] border border-dashed border-line-2 bg-surface/80 px-6 py-7 text-center"
-          >
-            <div className="mx-auto mb-3.5 flex size-[38px] items-center justify-center rounded-control bg-well">
-              <FrameIcon className="size-4 text-ink-4" />
+        <div className="screen-dots relative flex min-h-[330px] flex-1 flex-col">
+          {srcDoc === null ? (
+            <div className="flex flex-1 items-center justify-center p-6">
+              <div className="w-full max-w-[280px] rounded-[14px] border border-dashed border-line-2 bg-surface/80 px-6 py-7 text-center">
+                <div className="mx-auto mb-3.5 flex size-[38px] items-center justify-center rounded-control bg-well">
+                  <FrameIcon className="size-4 text-ink-4" />
+                </div>
+                <p className="text-[14.5px] font-bold tracking-[-0.01em]">{message.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-ink-3">{message.body}</p>
+              </div>
             </div>
-            <p className="text-[14.5px] font-bold tracking-[-0.01em]">{message.title}</p>
-            <p className="mt-1 text-xs leading-relaxed text-ink-3">{message.body}</p>
-          </div>
+          ) : (
+            // Absolute so the iframe gets a definite box to fill, whatever
+            // height the grid row settles on.
+            <div
+              className={`absolute inset-0 flex ${
+                viewport === "mobile" ? "justify-center p-4" : ""
+              }`}
+            >
+              <iframe
+                key={token}
+                ref={frameRef}
+                srcDoc={srcDoc}
+                title="Live preview of the generated component"
+                // No allow-same-origin: model-written code must not reach this
+                // origin's storage, cookies or DOM.
+                sandbox="allow-scripts"
+                className={`h-full border-0 bg-white ${
+                  viewport === "mobile"
+                    ? "w-[390px] max-w-full flex-none rounded-xl border border-line shadow-soft"
+                    : "w-full"
+                }`}
+              />
+            </div>
+          )}
         </div>
 
         <PanelFooter>
-          <span className="font-medium">Not rendered</span> ·{" "}
-          <span className="font-mono text-[11px]">live preview not built yet</span>
+          {srcDoc === null ? (
+            <>
+              <span className="font-medium">Not rendered</span> ·{" "}
+              <span className="font-mono text-[11px]">{NOTHING_TO_RENDER[result.kind]}</span>
+            </>
+          ) : mount.kind === "mounted" ? (
+            <>
+              <span className="font-medium text-ink-2">Rendered</span> ·{" "}
+              <span className="font-mono text-[11px]">
+                sandboxed iframe · react 18 · tailwind 4
+              </span>
+            </>
+          ) : mount.kind === "failed" ? (
+            <>
+              <span className="flex-none font-medium text-fault">Failed to render</span> ·{" "}
+              <span className="min-w-0 truncate font-mono text-[11px] text-fault/85">
+                {mount.message}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="font-medium">Rendering…</span> ·{" "}
+              <span className="font-mono text-[11px]">loading sandbox</span>
+            </>
+          )}
         </PanelFooter>
       </div>
     </section>
