@@ -5,6 +5,7 @@ import { tokenize, type TokenKind } from "@/components/highlight";
 import { downscaleForUpload } from "@/lib/downscale";
 import {
   buildPreviewDoc,
+  buildSandboxWrapperDoc,
   PREVIEW_MESSAGE_SOURCE,
   previewToken,
   type PreviewMessage,
@@ -15,6 +16,7 @@ import {
   CheckIcon,
   CodeIcon,
   CopyIcon,
+  ExternalLinkIcon,
   FrameIcon,
   GitHubIcon,
   MarkIcon,
@@ -576,6 +578,16 @@ function PreviewFrame({ result }: { result: Result }) {
   }, [srcDoc, token]);
 
   const failed = srcDoc !== null && mount.kind === "failed";
+  // The same condition the footer uses to say "Rendered": only a component
+  // that actually mounted in the sandbox is worth opening in a tab.
+  const rendered = srcDoc !== null && mount.kind === "mounted";
+  const openLabel = rendered
+    ? "Open in new tab"
+    : srcDoc === null
+      ? `Nothing to open — ${NOTHING_TO_RENDER[result.kind]}`
+      : mount.kind === "failed"
+        ? "Nothing to open — the component did not render"
+        : "Waiting for the component to render";
   const message = {
     idle: { title: "Nothing to preview yet", body: "Generate a component to see it here." },
     loading: { title: "Generating…", body: "Waiting on the model." },
@@ -600,27 +612,30 @@ function PreviewFrame({ result }: { result: Result }) {
       >
         <PanelHeader>
           <span className="font-mono text-[11px] text-ink-3">localhost</span>
-          <div
-            role="radiogroup"
-            aria-label="Preview viewport"
-            className="flex rounded-lg border border-line bg-inset p-[3px]"
-          >
-            {VIEWPORTS.map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                role="radio"
-                aria-checked={viewport === id}
-                onClick={() => setViewport(id)}
-                className={`rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors ${
-                  viewport === id
-                    ? "bg-surface text-ink shadow-sm"
-                    : "text-ink-3 hover:text-ink-2"
-                } ${FOCUS}`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <div
+              role="radiogroup"
+              aria-label="Preview viewport"
+              className="flex rounded-lg border border-line bg-inset p-[3px]"
+            >
+              {VIEWPORTS.map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={viewport === id}
+                  onClick={() => setViewport(id)}
+                  className={`rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors ${
+                    viewport === id
+                      ? "bg-surface text-ink shadow-sm"
+                      : "text-ink-3 hover:text-ink-2"
+                  } ${FOCUS}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <OpenInTabButton doc={rendered ? srcDoc : null} label={openLabel} />
           </div>
         </PanelHeader>
 
@@ -690,6 +705,81 @@ function PreviewFrame({ result }: { result: Result }) {
         </PanelFooter>
       </div>
     </section>
+  );
+}
+
+// How long an opened tab's object URLs are kept alive. Two things make this a
+// delay rather than an immediate revoke: the wrapper has to fetch the child URL
+// after the tab opens, and revoking when the *next* tab is opened would let a
+// second click pull the document out from under the first. A minute is far
+// longer than either needs and costs two strings of memory until it elapses.
+const OPENED_DOC_TTL_MS = 60_000;
+
+/**
+ * Opens the *same* document the panel iframe runs — straight from
+ * buildPreviewDoc — as a real top-level tab. The panel is only ~490px wide, so
+ * a component's md:/lg: classes never match there and every layout reads as its
+ * mobile one; a real tab gives it the full window.
+ *
+ * Two blobs, not one. The tab needs a URL and blob: is the only scheme that can
+ * carry a document (top-frame navigation to data: is refused outright), but a
+ * blob: URL inherits this app's origin — so opening the preview document
+ * directly would run model-written code on our origin, with our storage. The
+ * tab is therefore pointed at a wrapper that holds nothing but a sandboxed
+ * iframe pointing at the preview document, which puts the component back on an
+ * opaque origin, as unreachable from this app as it is in the panel.
+ */
+function OpenInTabButton({ doc, label }: { doc: string | null; label: string }) {
+  const opened = useRef<{ urls: string[]; timer: ReturnType<typeof setTimeout> }[]>([]);
+
+  useEffect(
+    () => () => {
+      for (const entry of opened.current) {
+        clearTimeout(entry.timer);
+        for (const url of entry.urls) URL.revokeObjectURL(url);
+      }
+      opened.current = [];
+    },
+    [],
+  );
+
+  function openTab() {
+    if (!doc) return;
+
+    // The payload is handed over by URL rather than inlined into the wrapper:
+    // nothing to escape (the preview document is full of `</script>`), and a
+    // wrapper with no script of its own cannot relay the mount messages the
+    // preview posts to its parent. An opened tab is fire-and-forget; only the
+    // in-panel iframe reports mount state.
+    const childUrl = URL.createObjectURL(new Blob([doc], { type: "text/html" }));
+    const wrapperUrl = URL.createObjectURL(
+      new Blob([buildSandboxWrapperDoc(childUrl)], { type: "text/html" }),
+    );
+    window.open(wrapperUrl, "_blank", "noopener,noreferrer");
+
+    const urls = [childUrl, wrapperUrl];
+    const timer = setTimeout(() => {
+      opened.current = opened.current.filter((entry) => entry.urls !== urls);
+      for (const url of urls) URL.revokeObjectURL(url);
+    }, OPENED_DOC_TTL_MS);
+    opened.current.push({ urls, timer });
+  }
+
+  return (
+    // The tooltip sits on the wrapper, not the button: browsers don't fire
+    // hover on a disabled control, and the disabled states are exactly the
+    // ones whose label has something to explain.
+    <span title={label} className="flex">
+      <button
+        type="button"
+        onClick={openTab}
+        disabled={doc === null}
+        aria-label={doc === null ? label : `${label} (opens in a new tab)`}
+        className={`flex size-[30px] items-center justify-center rounded-lg border border-line text-ink-2 transition-colors enabled:hover:bg-inset enabled:hover:text-ink disabled:cursor-not-allowed disabled:opacity-45 ${FOCUS}`}
+      >
+        <ExternalLinkIcon className="size-[13px]" />
+      </button>
+    </span>
   );
 }
 

@@ -249,6 +249,49 @@ try {
 }
 
 /**
+ * Host shell for opening a preview in a real browser tab.
+ *
+ * A tab needs a URL, and the only scheme that can carry a whole document is
+ * blob: — browsers refuse top-frame navigation to data: outright, whatever its
+ * length. But a blob: URL inherits this app's origin, so handing the preview
+ * document straight to window.open would run model-written code *on our
+ * origin*, with our storage — exactly what the in-panel iframe exists to
+ * prevent.
+ *
+ * So the tab gets this instead: a document that contains no generated code at
+ * all, only a full-viewport sandboxed iframe pointing at the preview document's
+ * own blob URL. The sandbox attribute forces an opaque origin on the child, so
+ * the component runs with no more reach than it has in the panel, while the
+ * iframe fills the window and its md:/lg: breakpoints finally match.
+ *
+ * Note there is no script here, and the payload is passed by URL rather than
+ * inlined: nothing to escape, and the wrapper cannot relay the mount messages
+ * the preview document posts to its parent — an opened tab is fire-and-forget,
+ * and only the in-panel iframe reports mount state.
+ *
+ * @param childUrl Object URL of a document built by buildPreviewDoc.
+ */
+export function buildSandboxWrapperDoc(childUrl: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Generated component preview</title>
+<style>html, body { margin: 0; height: 100%; background: #ffffff; }</style>
+</head>
+<body>
+<iframe
+  src="${childUrl}"
+  title="Generated component preview"
+  sandbox="allow-scripts"
+  style="border:0;position:fixed;inset:0;width:100%;height:100%"
+></iframe>
+</body>
+</html>`;
+}
+
+/**
  * @param code  Component source as returned by /api/generate (already
  *              parse-gated server-side).
  * @param token Per-document id from previewToken, echoed back on every

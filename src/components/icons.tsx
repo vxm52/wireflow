@@ -87,6 +87,16 @@ export function CodeIcon({ className }: IconProps) {
   );
 }
 
+export function ExternalLinkIcon({ className }: IconProps) {
+  return (
+    <svg {...stroke} strokeWidth={1.9} className={className}>
+      <path d="M14 4h6v6" />
+      <path d="m13 11 7-7" />
+      <path d="M19 13.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5.5" />
+    </svg>
+  );
+}
+
 export function GitHubIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={className}>
