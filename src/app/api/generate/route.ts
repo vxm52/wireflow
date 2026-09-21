@@ -47,16 +47,14 @@ function extractCode(text: string): string {
  * is no fallback component.
  */
 export async function POST(request: Request) {
-  // Abuse guards first: this endpoint is public and every call costs money.
-  // Both fail open if Redis is down (see src/lib/ratelimit.ts).
+  // Cheap abuse shield first: this endpoint is public, so reject a flooding IP
+  // before doing any parsing work. The global daily budget is charged further
+  // down, once we know the request is actually headed for the model. Both
+  // guards fail open if Redis is down (see src/lib/ratelimit.ts).
   const ip = getClientIp(request);
   const perIp = await checkIpLimit(ip);
   if (!perIp.allowed) {
     return Response.json({ error: perIp.reason }, { status: 429 });
-  }
-  const daily = await checkDailyBudget();
-  if (!daily.allowed) {
-    return Response.json({ error: daily.reason }, { status: 429 });
   }
 
   let file: FormDataEntryValue | null;
@@ -88,6 +86,14 @@ export async function POST(request: Request) {
       { error: "ANTHROPIC_API_KEY is not set on the server." },
       { status: 500 },
     );
+  }
+
+  // The request is valid and about to cost money, so charge the global daily
+  // budget here rather than at the top: a malformed or oversized upload gets
+  // its own 400/413 above without burning a slot the demo can't get back.
+  const daily = await checkDailyBudget();
+  if (!daily.allowed) {
+    return Response.json({ error: daily.reason }, { status: 429 });
   }
 
   const mediaType = file.type;

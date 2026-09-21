@@ -70,6 +70,10 @@ export async function checkIpLimit(ip: string): Promise<GuardResult> {
 /**
  * Global circuit breaker: at most DAILY_MAX generations per calendar day
  * (UTC). The key expires after 48h so old days clean themselves up.
+ *
+ * Calling this IS the charge — it increments first and judges afterwards — so
+ * only call it once a request is known to be headed for the model. Charging a
+ * request that later 400s would let invalid uploads drain the day's budget.
  */
 export async function checkDailyBudget(): Promise<GuardResult> {
   const key = `wf:day:${new Date().toISOString().slice(0, 10)}`;
