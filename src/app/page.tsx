@@ -27,6 +27,11 @@ import {
 const ACCEPTED_TYPES = ["image/png", "image/jpeg"];
 const REPO_URL = "https://github.com/vxm52/wireflow";
 
+// Shown under the drop zone, before anything is uploaded: the image leaves the
+// browser for a third party, so say so plainly where the choice is made.
+const UPLOAD_NOTE =
+  "Images are sent to Anthropic to generate code — don't upload anything confidential.";
+
 // Shape of /api/generate responses: { code } on 200; { error, detail?, code? }
 // otherwise (a 422 carries the unparseable code for inspection).
 type GenerateBody = { code?: unknown; error?: unknown; detail?: unknown };
@@ -191,6 +196,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
+              aria-describedby="upload-note"
               onDragOver={(e) => {
                 e.preventDefault();
                 setIsDragging(true);
@@ -247,6 +253,17 @@ export default function Home() {
               <ArrowRightIcon className="size-4" />
             </button>
           </div>
+
+          <p id="upload-note" className="mt-3 text-[12.5px] leading-relaxed text-ink-3">
+            {UPLOAD_NOTE}{" "}
+            <span aria-hidden="true">·</span>{" "}
+            <Link
+              href="/privacy"
+              className={`underline decoration-line-2 underline-offset-2 transition-colors hover:text-ink-2 ${FOCUS}`}
+            >
+              Privacy
+            </Link>
+          </p>
 
           {error && (
             <p
