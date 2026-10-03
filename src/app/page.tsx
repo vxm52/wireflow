@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { tokenize, type TokenKind } from "@/components/highlight";
 import { downscaleForUpload } from "@/lib/downscale";
 import {
@@ -269,6 +270,23 @@ export default function Home() {
           <PreviewFrame result={result} />
         </div>
       </main>
+
+      <footer className="mt-12 flex items-center gap-2.5 text-[12.5px] font-medium text-ink-3">
+        <Link href="/privacy" className={`transition-colors hover:text-ink-2 ${FOCUS}`}>
+          Privacy
+        </Link>
+        <span aria-hidden="true" className="text-ink-4">
+          ·
+        </span>
+        <a
+          href={REPO_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`transition-colors hover:text-ink-2 ${FOCUS}`}
+        >
+          GitHub
+        </a>
+      </footer>
     </div>
   );
 }
